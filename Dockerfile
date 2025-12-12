@@ -28,13 +28,15 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 
 # Copier les fichiers critiques NÉCESSAIRES avant l'installation des dépendances
-# CORRECTION du 'Could not open input file: artisan'
+# CORRECTION du 'Failed opening required /var/www/html/bootstrap/app.php'
 COPY composer.* ./
 COPY package.json ./
 COPY package-lock.json ./
 COPY vite.config.js ./
 COPY artisan ./
-# Ajoutez d'autres fichiers de configuration nécessaires ici (ex: tailwind.config.js si utilisé par vite.config.js)
+# AJOUT CRITIQUE : Le dossier bootstrap est nécessaire pour que 'artisan' fonctionne
+COPY bootstrap/ ./bootstrap/ 
+# Copiez tout autre fichier de configuration nécessaire ici (ex: tailwind.config.js)
 
 # Installer les dépendances PHP
 RUN composer install --no-dev --optimize-autoloader
