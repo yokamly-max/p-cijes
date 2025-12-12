@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer Node.js 20 et NPM (pour le build Vite/frontend)
+# Nous conservons la version 20 pour la compatibilité
 RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -27,16 +28,23 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Définir le répertoire de travail
 WORKDIR /var/www/html
 
-# Copier les fichiers critiques NÉCESSAIRES avant l'installation des dépendances
-# CORRECTION du 'Failed opening required /var/www/html/bootstrap/app.php'
+# --- COPIE DES FICHIERS NÉCESSAIRES POUR COMPOSER/ARTISAN ---
+# Ces fichiers sont nécessaires pour que 'composer install' puisse exécuter Laravel's 'package:discover'
+
+# Fichiers de configuration
 COPY composer.* ./
 COPY package.json ./
 COPY package-lock.json ./
 COPY vite.config.js ./
 COPY artisan ./
-# AJOUT CRITIQUE : Le dossier bootstrap est nécessaire pour que 'artisan' fonctionne
-COPY bootstrap/ ./bootstrap/ 
-# Copiez tout autre fichier de configuration nécessaire ici (ex: tailwind.config.js)
+COPY .env.example ./.env # IMPORTANT : Copier .env.example pour qu'artisan ne plante pas
+
+# Dossiers critiques :
+COPY app/ ./app/              # CORRIGE l'erreur 'AppServiceProvider not found'
+COPY bootstrap/ ./bootstrap/  # CORRIGE l'erreur 'app.php not found'
+COPY config/ ./config/        # Assure que toutes les configurations sont disponibles (nécessaire pour la plupart des packages)
+# --- FIN DE COPIE CRITIQUE ---
+
 
 # Installer les dépendances PHP
 RUN composer install --no-dev --optimize-autoloader
@@ -48,16 +56,17 @@ RUN npm run build
 # Copier le reste du code source
 COPY . .
 
-# Corriger le problème de git ownership qui peut affecter Composer/Artisan
+# Corriger le problème de git ownership
 RUN git config --global --add safe.directory /var/www/html
 
 # Nettoyage et Optimisations Laravel
+# Nous exécutons ces commandes seulement après avoir copié tout le code (ligne 'COPY . .')
+# pour s'assurer que tous les fichiers sont en place pour le caching.
 RUN php artisan key:generate --force
 RUN php artisan config:cache
 RUN php artisan route:cache
 RUN php artisan view:clear
-# Note: Ne pas cacher les vues si vous faites des modifications fréquentes en dev.
-# RUN php artisan view:cache 
+# RUN php artisan view:cache # Décommenter si vous souhaitez cacher les vues
 
 # ==============================
 # ÉTAPE 2 : PRODUCTION (Image Finale Légère)
@@ -68,17 +77,15 @@ FROM php:8.2-fpm
 # Définir le répertoire de travail
 WORKDIR /var/www/html
 
-# Copier le code construit depuis l'étape 'build'
+# Copier le code construit (dépendances PHP et frontend) depuis l'étape 'build'
 COPY --from=build /var/www/html /var/www/html
 
-# CRITIQUE pour le 502 : Définir les permissions de l'utilisateur FPM
+# CRITIQUE : Définir les permissions de l'utilisateur FPM
 # L'utilisateur www-data doit être propriétaire des dossiers de cache et de stockage.
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Exposer le port PHP-FPM
 EXPOSE 9000
 
-# Commande de lancement
-# Le 'php-fpm' va démarrer et se lier au port 9000, prêt à recevoir les requêtes
-# du proxy de Dokploy.
+# Commande de lancement par défaut
 CMD ["php-fpm"]
