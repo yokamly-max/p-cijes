@@ -40,6 +40,7 @@ COPY artisan ./
 COPY app/ ./app/
 COPY bootstrap/ ./bootstrap/
 COPY config/ ./config/
+COPY routes/ ./routes/
 # --- FIN DE COPIE CRITIQUE ---
 
 
