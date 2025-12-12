@@ -1,5 +1,6 @@
 # ==============================
 # ÉTAPE 1 : BUILD (Construction)
+# Utilise une image complète pour installer les dépendances et compiler.
 # ==============================
 FROM php:8.2-fpm AS build
 
@@ -40,7 +41,7 @@ COPY bootstrap/ ./bootstrap/
 COPY config/ ./config/
 COPY routes/ ./routes/
 COPY resources/ ./resources/
-COPY database/ ./database/  # Ajout critique pour les migrations/Artisan
+COPY database/ ./database/
 
 # --- FIN DE COPIE CRITIQUE ---
 
@@ -65,7 +66,6 @@ RUN mkdir -p storage/framework/sessions \
     && mkdir -p storage/logs
 
 # Nettoyage et Optimisations Laravel (Caches)
-# Nous utilisons APP_ENV=production par défaut pour le cache
 RUN sed -i '/^APP_ENV=/c\APP_ENV=production' ./.env
 RUN sed -i '/^APP_DEBUG=/c\APP_DEBUG=false' ./.env
 RUN php artisan key:generate --force
