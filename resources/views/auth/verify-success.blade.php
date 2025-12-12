@@ -45,7 +45,7 @@
         <h1>✅ Mail de confirmation envoyé !</h1>
         <p>Merci de confirmer votre adresse email.<br>
         Après cela vous pourrez accéder à votre compte e-CIJES Africa.</p>
-        <a href="{{ url('/') }}">Aller à l’accueil</a>
+        <a href="{{ url('/membres/dashboard') }}">Aller à l’accueil</a>
     </div>
 </body>
 </html>
