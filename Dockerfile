@@ -1,75 +1,82 @@
-
-# Utiliser une image complète pour le build (y compris Node/NPM)
 # ==============================
-FROM php:8.2-fpm AS base
+# ÉTAPE 1 : BUILD (Construction)
+# Utilise une image complète pour installer les dépendances et compiler.
+# ==============================
+FROM php:8.2-fpm AS build
 
-# 1. Installer les dépendances système (y compris l'outil "wait-for-it" si nécessaire)
+# Installer les dépendances système (Git, Curl, Unzip, libs PHP)
+# Ajout de gnupg pour l'installation de Node.js
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     unzip \
     libpq-dev \
     libzip-dev \
-    # Nodejs et npm seront installés via un autre RUN pour simplifier
+    gnupg \
     && docker-php-ext-install pdo pdo_mysql zip \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Installer Node.js et NPM (Mise à jour de l'installation pour éviter les problèmes de paquets)
+# Installer Node.js 20 et NPM (pour le build Vite/frontend)
 RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Ajouter Composer
+# Ajouter Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Définir le répertoire de travail
 WORKDIR /var/www/html
 
-# 4. Copier le code (seulement le strict nécessaire pour minimiser la taille de l'image)
+# Copier les fichiers critiques NÉCESSAIRES avant l'installation des dépendances
+# CORRECTION du 'Could not open input file: artisan'
 COPY composer.* ./
 COPY package.json ./
 COPY package-lock.json ./
 COPY vite.config.js ./
-# ... autres fichiers de config essentiels ...
+COPY artisan ./
+# Ajoutez d'autres fichiers de configuration nécessaires ici (ex: tailwind.config.js si utilisé par vite.config.js)
 
-# 5. Installer les dépendances PHP et Node
+# Installer les dépendances PHP
 RUN composer install --no-dev --optimize-autoloader
-RUN npm install
 
-# Copier le reste du code
+# Installer les dépendances Node et compiler le frontend
+RUN npm install
+RUN npm run build
+
+# Copier le reste du code source
 COPY . .
 
-# 6. Corriger le problème de git ownership
+# Corriger le problème de git ownership qui peut affecter Composer/Artisan
 RUN git config --global --add safe.directory /var/www/html
 
-# 7. Optimisations Laravel et build du frontend
+# Nettoyage et Optimisations Laravel
 RUN php artisan key:generate --force
 RUN php artisan config:cache
 RUN php artisan route:cache
-RUN php artisan view:cache
-RUN npm run build
-
+RUN php artisan view:clear
+# Note: Ne pas cacher les vues si vous faites des modifications fréquentes en dev.
+# RUN php artisan view:cache 
 
 # ==============================
-# Étape 2 : Production (Image Finale Légère)
-# Utiliser une image de base FPM plus simple pour l'exécution
+# ÉTAPE 2 : PRODUCTION (Image Finale Légère)
+# Basée sur l'image fpm standard
 # ==============================
 FROM php:8.2-fpm
 
 # Définir le répertoire de travail
 WORKDIR /var/www/html
 
-# 8. Copier uniquement les fichiers nécessaires depuis l'étape de construction
-COPY --from=base /var/www/html /var/www/html
+# Copier le code construit depuis l'étape 'build'
+COPY --from=build /var/www/html /var/www/html
 
-# 9. Correction CRITIQUE des permissions
-# S'assurer que les fichiers appartiennent à l'utilisateur PHP-FPM (www-data)
-RUN chown -R www-data:www-data /var/www/html
-RUN chmod -R 775 storage bootstrap/cache
+# CRITIQUE pour le 502 : Définir les permissions de l'utilisateur FPM
+# L'utilisateur www-data doit être propriétaire des dossiers de cache et de stockage.
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# 10. Mise à jour de la commande de démarrage
-# S'assurer que php-fpm écoute sur 0.0.0.0 (toutes les interfaces)
-# Dokploy (ou Nginx) pourra ainsi se connecter.
-# L'EXPOSE 9000 est inclus dans l'image de base FPM par défaut.
-# Si vous utilisez un fichier de configuration PHP-FPM personnalisé, assurez-vous qu'il écoute sur 0.0.0.0:9000.
+# Exposer le port PHP-FPM
+EXPOSE 9000
+
+# Commande de lancement
+# Le 'php-fpm' va démarrer et se lier au port 9000, prêt à recevoir les requêtes
+# du proxy de Dokploy.
 CMD ["php-fpm"]
