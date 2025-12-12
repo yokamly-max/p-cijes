@@ -37,7 +37,6 @@ COPY package.json ./
 COPY package-lock.json ./
 COPY vite.config.js ./
 COPY artisan ./
-COPY .env.example ./.env # IMPORTANT : Copier .env.example pour qu'artisan ne plante pas
 
 # Dossiers critiques :
 COPY app/ ./app/              # CORRIGE l'erreur 'AppServiceProvider not found'
