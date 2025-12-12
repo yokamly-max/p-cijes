@@ -5,7 +5,6 @@
 FROM php:8.2-fpm AS build
 
 # Installer les dépendances système (Git, Curl, Unzip, libs PHP)
-# Ajout de gnupg pour l'installation de Node.js
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -17,7 +16,6 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer Node.js 20 et NPM (pour le build Vite/frontend)
-# Nous conservons la version 20 pour la compatibilité
 RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -28,8 +26,8 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Définir le répertoire de travail
 WORKDIR /var/www/html
 
-# --- COPIE DES FICHIERS NÉCESSAIRES POUR COMPOSER/ARTISAN ---
-# Ces fichiers sont nécessaires pour que 'composer install' puisse exécuter Laravel's 'package:discover'
+# --- COPIE DES FICHIERS MINIMAUX POUR COMPOSER/ARTISAN ---
+# Ces fichiers permettent à Composer et Artisan de démarrer correctement.
 
 # Fichiers de configuration
 COPY composer.* ./
@@ -39,9 +37,9 @@ COPY vite.config.js ./
 COPY artisan ./
 
 # Dossiers critiques :
-COPY app/ ./app/              # CORRIGE l'erreur 'AppServiceProvider not found'
-COPY bootstrap/ ./bootstrap/  # CORRIGE l'erreur 'app.php not found'
-COPY config/ ./config/        # Assure que toutes les configurations sont disponibles (nécessaire pour la plupart des packages)
+COPY app/ ./app/
+COPY bootstrap/ ./bootstrap/
+COPY config/ ./config/
 # --- FIN DE COPIE CRITIQUE ---
 
 
@@ -58,14 +56,12 @@ COPY . .
 # Corriger le problème de git ownership
 RUN git config --global --add safe.directory /var/www/html
 
-# Nettoyage et Optimisations Laravel
-# Nous exécutons ces commandes seulement après avoir copié tout le code (ligne 'COPY . .')
-# pour s'assurer que tous les fichiers sont en place pour le caching.
+# Nettoyage et Optimisations Laravel (Caches)
 RUN php artisan key:generate --force
 RUN php artisan config:cache
 RUN php artisan route:cache
 RUN php artisan view:clear
-# RUN php artisan view:cache # Décommenter si vous souhaitez cacher les vues
+# RUN php artisan view:cache
 
 # ==============================
 # ÉTAPE 2 : PRODUCTION (Image Finale Légère)
