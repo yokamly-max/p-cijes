@@ -26,8 +26,8 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Définir le répertoire de travail
 WORKDIR /var/www/html
 
-# --- COPIE DES FICHIERS MINIMAUX POUR COMPOSER/ARTISAN ---
-# Ces fichiers permettent à Composer et Artisan de démarrer correctement.
+# --- COPIE DES FICHIERS MINIMAUX POUR COMPOSER/ARTISAN ET VITE ---
+# Ces fichiers permettent à Composer/Artisan ET à Vite de démarrer correctement.
 
 # Fichiers de configuration
 COPY composer.* ./
@@ -41,6 +41,7 @@ COPY app/ ./app/
 COPY bootstrap/ ./bootstrap/
 COPY config/ ./config/
 COPY routes/ ./routes/
+COPY resources/ ./resources/
 # --- FIN DE COPIE CRITIQUE ---
 
 
